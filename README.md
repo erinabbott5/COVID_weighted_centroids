@@ -1,7 +1,7 @@
 # COVID_weighted_centroids
 
 
-Current version published on 08/07/2020
+Current version last edited on 08/09/2020
 
 
 ## Authorship 
