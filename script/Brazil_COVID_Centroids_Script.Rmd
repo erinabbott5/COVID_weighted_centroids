@@ -1,0 +1,306 @@
+---
+title: "brazil_covid_national"
+output: html_notebook
+---
+Author: Erin Abbott
+Last edited 08/07/2020
+
+
+Data reading and prep: 
+
+```{r}
+
+library(dplyr)
+library(sf)
+library(tmap)
+library(tidyverse)
+library(tmap)
+library(stplanr)
+
+
+state <- st_read("< your file path >")
+state <- state %>% rename(state_code = CD_GEOCUF) %>% st_transform(., 29101)
+state$state_code <- as.character(state$state_code)
+state["country_code"] <- "BRA"
+state_simple <- rmapshaper::ms_simplify(state, keep = 0.1,keep_shapes = TRUE)
+
+
+munic <- st_read("< your file path >")
+munic <- munic %>% rename(ibge_code = CD_GEOCMU) %>% st_transform(., 29101)
+munic$ibge_code <- as.character(munic$ibge_code)
+munic <- munic %>% st_as_sf(.) %>% st_make_valid(.)
+munic["country_code"] <- "BRA"
+munic <- munic %>% mutate(state_code = substring(ibge_code,1,2)) %>% select(NM_MUNICIP, ibge_code, state_code, country_code)
+
+
+cases <- read.csv("< your file path >")
+cases$ibge_code <- as.character(cases$ibge_code)
+
+
+brazil <- state_simple %>% group_by(country_code) %>% summarise(num_states= n())
+head(brazil)
+
+
+brazil_geogcent <- st_centroid(st_geometry(brazil))
+state_simple_geogcent <- st_centroid(st_geometry(state_simple))
+munic_geogcent <- st_centroid(st_geometry(munic))
+
+capital <- st_read("< your file path >")
+capital <- capital %>% filter(FEATURECLA=="Admin-0 capital") %>% st_transform(29101)
+
+
+# checking the shapefiles
+tm_shape(brazil) + tm_borders() + tm_shape(brazil_geogcent)+tm_dots()
+tm_shape(state_simple) + tm_borders() + tm_shape(state_simple_geogcent) + tm_dots()
+tm_shape(munic) + tm_borders()
+```
+
+
+
+Weighted centroid function: 
+- Code contribution credit to Grant Morisson: https://github.com/morrisonge/GIS3/blob/master/gis_discussion.Rmd 
+
+```{r}
+# weighted centroid function
+
+national_weighted_centroid <- function(st, id, case_num){
+  
+  centroids <- st_centroid(st_geometry(st))
+  
+  centroid_coordinates <- do.call(rbind,centroids) %>% as_tibble() %>% setNames(c("x", "y"))
+  
+  st["x"] <- centroid_coordinates["x"]
+  st["y"] <- centroid_coordinates["y"]
+  
+  st.df <- st_drop_geometry(st)
+  
+  nation <- unique(st.df[id]) 
+  
+  x <- rep(NA, length(nation))
+  y <- rep(NA, length(nation))
+  
+  for(e in 1:nrow(nation)){
+    nation_states <- st.df[which(st.df[id]==nation[e,]),]
+    w <- nation_states[case_num]
+    wx <- nation_states["x"]*w
+    wy <- nation_states["y"]*w
+    x[e] <- sum(wx)/sum(w)
+    y[e] <- sum(wy)/sum(w)
+
+  }
+  output <- data.frame(nation, x, y)
+  
+  sf_output <- st_as_sf(output, coords=c("x", "y")) %>% st_set_crs(.,29101)
+}
+```
+
+
+
+Weekly line data and map creation: 
+
+```{r}
+
+start_week_id <- 9
+end_week_id <- 27
+
+weekly_line_merge <- st_sf(period=NA, pi=0, i=0, x_pi=0, y_pi=0, x_i = 0, y_i = 0, nm_munic=NA, geometry = st_sfc(lapply(NA, function(x) st_linestring())), cap_line = st_sfc(lapply(NA, function(x) st_linestring()))) 
+weekly_line_merge <- st_set_crs(weekly_line_merge,29101)
+
+
+linecols4 <- c("#bdbdbd", #9
+              "#969696", #10
+              "#636363", #11
+              "#252525", #12
+              "#a1d99b",  #13
+              "#74c476", #14
+              "#31a354", #15
+              "#006d2c", #16
+             "#6baed6", #17
+             "#3182bd", #18
+             "#08519c", #19
+              "#bcbddc", #20
+             "#9e9ac8", #21
+             "#756bb1", #22
+             "#54278f", #23
+             "#fc9272", #24
+              "#fb6a4a", #25
+              "#de2d26") #26
+
+
+for (i in start_week_id:end_week_id){
+  
+   a <- if(i==start_week_id){
+      (i)
+    } else{
+      (i-1)
+    }
+   
+  ###for current week###
+  week_temp <- cases %>% filter(epidemiological_week==i) %>% group_by(ibge_code, epidemiological_week) %>% summarise(sum_cases = sum(daily.cases), sum_deaths=sum(daily.deaths)) %>% select(ibge_code,epidemiological_week, sum_cases, sum_deaths) 
+  
+  week_temp$ibge_code <- as.character(week_temp$ibge_code)
+  
+  spat_temp <- left_join(munic, week_temp, by = "ibge_code")
+  spat_temp[["sum_cases"]][is.na(spat_temp[["sum_cases"]])] <- 0 
+  spat_temp[["sum_deaths"]][is.na(spat_temp[["sum_deaths"]])] <- 0
+
+  centroids_temp <- national_weighted_centroid(spat_temp, "country_code", "sum_cases")
+  centroids_temp["week"]<-i
+  centroids_temp$week <- as.numeric(centroids_temp$week)
+  centroids_temp["week_prev"] <- a
+  centroids_temp["period"] <- paste0(i-1,"_",i)
+  centroids_temp_geom <- centroids_temp[["geometry"]]
+  
+  #need to split x and y
+  coords_temp <- do.call(rbind,centroids_temp_geom) %>% as_tibble() %>% setNames(c("x", "y"))
+  
+  centroids_temp["x"] <- coords_temp["x"]
+  centroids_temp["y"] <- coords_temp["y"]
+  
+  centroids_temp <- st_set_crs(centroids_temp,29101)
+  
+  centroids_temp.df <- st_drop_geometry(centroids_temp)
+  
+  
+  ###for previous week###
+
+          week_temp_prev <- cases %>% filter(epidemiological_week==(a)) %>% group_by(ibge_code, epidemiological_week) %>% summarise(sum_cases = sum(daily.cases), sum_deaths=sum(daily.deaths)) %>% select(ibge_code, epidemiological_week, sum_cases, sum_deaths) 
+          
+          spat_temp_prev <- left_join(munic, week_temp_prev, by = "ibge_code")
+          spat_temp_prev[["sum_cases"]][is.na(spat_temp_prev[["sum_cases"]])] <- 0 
+          spat_temp_prev$sum_deaths[is.na(spat_temp_prev$sum_deaths)] <- 0
+        
+          centroids_temp_prev <- national_weighted_centroid(spat_temp_prev, "country_code", "sum_cases")
+             
+             
+              
+          centroids_temp_prev["week"]<- a
+          centroids_temp_prev$week <- as.numeric(centroids_temp_prev$week)
+          centroids_temp_prev_geom <- centroids_temp_prev[["geometry"]]
+          
+          #need to split x and y
+          coords_temp_prev <- do.call(rbind,centroids_temp_prev_geom) %>% as_tibble() %>% setNames(c("x", "y"))
+          
+          centroids_temp_prev["x"] <- coords_temp_prev["x"]
+          centroids_temp_prev["y"] <- coords_temp_prev["y"]
+
+          centroids_temp_prev.df <- st_drop_geometry(centroids_temp_prev)
+          
+          
+    cent_munic_join <- st_join(centroids_temp, munic["NM_MUNICIP"])
+    cent_munic_join.df <- st_drop_geometry(cent_munic_join)
+    
+    capital_temp <- capital
+    capital_temp_geom <- capital[["geometry"]]
+    capital_coords_temp <- do.call(rbind,capital_geom) %>% as_tibble() %>% setNames(c("x", "y"))
+    capital_temp <- st_drop_geometry(capital_temp)
+          
+          capital_temp["x"] <- capital_coords_temp["x"]
+          capital_temp["y"] <- capital_coords_temp["y"]
+          
+    ### getting weekly change in coordinates as lines
+    weekly_cent_temp  <- st_as_sf(data.frame(period = paste0(a,"_",i),
+                                    pi = centroids_temp.df["week_prev"],
+                                    i = centroids_temp.df["week"],
+                                    x_pi = centroids_temp_prev.df["x"],
+                                    y_pi = centroids_temp_prev.df["y"],
+                                    x_i = centroids_temp.df["x"],
+                                    y_i = centroids_temp.df["y"],
+                                    x_cap = capital_temp["x"],
+                                    y_cap = capital_temp["y"],
+                                    nm_munic = cent_munic_join.df["NM_MUNICIP"],
+                                    geometry= centroids_temp_geom))
+    names(weekly_cent_temp) <- c('period', 'pi', 'i', 'x_pi', 'y_pi','x_i','y_i','x_cap', 'y_cap','nm_munic', 'geometry')
+    
+    weekly_cent_temp$geometry <- st_sfc(st_linestring(rbind(st_point(c(weekly_cent_temp$x_pi, weekly_cent_temp$y_pi)), st_point(c(weekly_cent_temp$x_i, weekly_cent_temp$y_i)))))
+    weekly_cent_temp$cap_line <- st_sfc(st_linestring(rbind(st_point(c(weekly_cent_temp$x_i, weekly_cent_temp$y_i)), st_point(c(weekly_cent_temp$x_cap, weekly_cent_temp$y_cap)))))
+    weekly_cent_temp <- st_set_crs(weekly_cent_temp,29101)
+    weekly_cent_temp <-weekly_cent_temp %>% select(!"x_cap") %>% select(!"y_cap") %>% st_set_crs(.,29101) %>% st_transform(.,29101)
+  
+  
+  weekly_line_merge <- rbind(weekly_line_merge,weekly_cent_temp) %>% filter(!is.na(period)) %>% filter(period!="9_9") 
+  weekly_line_merge<- weekly_line_merge %>% st_set_crs(.,29101) %>% st_transform(.,29101) 
+  weekly_line_merge<- weekly_line_merge %>% rename("Period" = "period")
+    
+  
+  maxval_temp <- max(spat_temp$sum_cases)
+  
+  if(maxval_temp < 1001){
+    maxval_temp2.nm <- 1002
+    maxval_temp2.chr <- "> 1,000"
+    
+  } else{
+    maxval_temp2.nm <- maxval_temp
+    maxval_temp2.chr <- maxval_temp %>% formatC(., format="f", big.mark=",", digits=0) 
+    maxval_temp2.chr <- paste0("1,001 - ", maxval_temp2.chr)
+  }
+  
+  if(i==start_week_id){
+  
+  nbin9 <- tm_shape(brazil) + tm_borders(lwd=0.5) + tm_shape(spat_temp) + tm_fill(col="sum_cases", palette = "OrRd", breaks=c(0,0.1,10.1,100.1,1000.1,maxval_temp2.nm), title = "Total Cases", alpha=0.5, labels = c ("0","1 - 10", "11 - 100", "101 - 1,000", maxval_temp2.chr)) + tm_shape(state_simple) + tm_borders(col="gray60", lwd=0.5) + tm_layout(main.title = "COVID-19 Case-Weighted Centroid for Brazil", main.title.size = 1.2, main.title.position = "center", frame=FALSE, legend.outside = TRUE) + tm_credits(paste0("Week ", i), size=1,position= "left") + tm_shape(centroids_temp) + tm_bubbles(size=0.5, border.col="red", border.lwd=1.2, border.alpha=1, col="white", alpha=0.1) + tm_scale_bar(color.dark = "gray60", position = c("right", "bottom"),just="right", width = 0.15, text.color = "gray60")
+ print(nbin9)
+
+ tmap_save(nbin9, paste0("< your file path > / Week_",i,".png"))
+  
+  } else{
+
+   nbin <- tm_shape(brazil) + tm_borders(lwd=0.5) + tm_shape(spat_temp) + tm_fill(col="sum_cases", palette = "OrRd", breaks=c(0,0.1,10.1,100.1,1000.1,maxval_temp2.nm), title = "Total Cases", alpha=0.5, labels = c ("0","1 - 10", "11 - 100", "101 - 1,000", maxval_temp2.chr)) + tm_shape(state_simple) + tm_borders(col="gray60", lwd=0.5) + tm_layout(main.title = "COVID-19 Case-Weighted Centroid for Brazil", main.title.size = 1.5, main.title.position = "center", frame=FALSE, legend.outside = TRUE) + tm_credits(paste0("Week ", i), size=1,position= "left") + tm_shape(weekly_line_merge) + tm_lines(col="Period", lwd=3, palette = linecols4, labels = c ("9 - 10","10 - 11", "11 - 12", "12 - 13", "13 - 14", "14 - 15", "15 - 16", "16 - 17", "17 - 18", "18 - 19", "19 - 20", "20 - 21", "21 - 22", "22 - 23", "23 - 24", "24 - 25", "25 - 26", "26 - 27")) + tm_shape(centroids_temp) + tm_bubbles(size=0.5, border.col="red", border.lwd=1.2, border.alpha=1, col="white", alpha=0.1) + tm_scale_bar(breaks = c(0,500,1000), color.dark = "gray60", position = c("right", "bottom"),just="right", text.color = "gray60")
+  print(nbin) 
+  
+  tmap_save(nbin, paste0("< your file path > /Week_",i,".png"))
+  }
+  
+    weekly_line_merge<- weekly_line_merge %>% rename("period" = "Period")
+
+}
+
+
+```
+
+
+
+Calculate line lengths and direction, export data:
+
+```{r}
+
+
+dist <- weekly_line_merge %>% mutate(length_cents = st_length(geometry)) %>% mutate(length_cap = st_length(cap_line)) 
+dist
+
+dir <- dist %>% st_transform(4326)
+dir2 <- dir %>% mutate(bearing = line_bearing(.))
+dir3 <- dir2 %>% mutate(azimuth= (bearing + 360) %% 360 )
+dir3
+
+
+
+nation_export <- dir3 %>% dplyr::select(period, pi, i, nm_munic, length_cents, length_cap, azimuth) %>% st_drop_geometry()
+nation_export
+
+write.csv(nation_export, "< your file path > /National_lines_data.csv", row.names = FALSE)
+
+nation_export_shp <- dir3 %>% st_transform(29101) %>% select(!bearing) 
+nation_export_shp
+
+st_write(nation_export_shp, "< your file path > /National_lines_data.shp", drive="ESRI Shapefile")
+
+
+
+```
+
+
+
+
+GIF animation of maps: 
+```{r}
+library(magick)
+list.files(path='/Users/erin/Desktop/Harvard_NSF_REU/Brazil_COVID/National_files/National_weekly_visualizations/national_weekly_images', pattern = '*.png', full.names = TRUE) %>% 
+        image_read() %>% # reads each path file
+        image_join() %>% # joins image
+        image_animate(delay=100) %>% # animates, can opt for number of loops
+        image_write("/Users/erin/Desktop/Harvard_NSF_REU/Brazil_COVID/National_files/national_weekly_visualizations/Nation_centroids.gif") # write to current dir
+
+
+```
+
+
