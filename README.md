@@ -21,6 +21,7 @@ This script was developed to investigate movement of the COVID-19 case-weighted 
 With this script, we were able to plot the path of the COVID-19 weighted centroids with line strings and a centroid at the location of the final week's centroid. We also include a choropleth map for the case count in the last available epidemiological week using a logarithmic classification due to the wide range of case counts in the different municipalities. We also wanted a table exported containing lengths of each line connecting the centroids, the length between each centroid and the capital city, and the direction of the line. These were included to answer specific research questions. 
 
 Example output: 
+
 < animation of moving centroid with weekly progression or week 27 static map > 
 
 ## Guidance
@@ -31,6 +32,7 @@ Input files:
   * Unique identifier for the sub-unit: Municipality ID (ibge_code)
   * Geographic boundaries for the shapefiles 
   * example: 
+  
     < insert image of municipalities shapefile >
     
 * COVID-19 cases CSV: including - 
@@ -39,6 +41,7 @@ Input files:
   * Date number: (date)
   * COVID-19 case count: (daily.cases)
   * example:
+  
     < insert image of cases csv table here >
 
 * Optional: 
