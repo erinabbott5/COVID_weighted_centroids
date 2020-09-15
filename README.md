@@ -1,9 +1,9 @@
 # COVID_weighted_centroids
 
 
-Current version last edited on 08/09/2020
+Current version of code last edited on 08/09/2020
 
-T?his is Jeff saying hi
+
 
 ## Authorship 
 
