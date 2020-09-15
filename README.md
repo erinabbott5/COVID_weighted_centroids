@@ -23,7 +23,7 @@ With this script, we were able to plot the path of the COVID-19 weighted centroi
 
 Example output: 
 
-![Alt text](/Users/erin/Desktop/Harvard_NSF_REU/Brazil_COVID/github/Nation_all_weeks_animated.gif?raw=true "Title")
+![Nation_all_weeks_animated](https://user-images.githubusercontent.com/50806151/93228543-97362900-f743-11ea-8b62-030f2aed9af1.gif)
 
 ## Guidance
 This script may be adapated to different countries by an individual comfortable with R scripting. This process will work with any sub-unit of a nation, whether it be regions, states, counties, municpalities,or census tracts, as long as there are smaller units which make up a larger unit for which you want to find the weighted centroid for. In order to adapt this script, we recommend the following files/formats and potential code changes: 
@@ -34,7 +34,7 @@ Input files:
   * Geographic boundaries for the shapefiles 
   * example: 
   
-    < insert image of municipalities shapefile >
+![muni_image](https://user-images.githubusercontent.com/50806151/93228638-b59c2480-f743-11ea-8dee-2c9135e1c121.png)
     
 * COVID-19 cases CSV: including - 
   * Sub-unit unique identifier: Municipality ID (ibge_code)
@@ -43,7 +43,7 @@ Input files:
   * COVID-19 case count: (daily.cases)
   * example:
   
-    < insert image of cases csv table here >
+<img width="1140" alt="input_csv" src="https://user-images.githubusercontent.com/50806151/93228629-b339ca80-f743-11ea-8b14-a83aa16a8fff.png">
 
 * Optional: 
   * Another unit boundary shapefile: we also have a state boundaries shapefile which is only used in the visualization
