@@ -19,7 +19,7 @@ This script was developed to investigate movement of the COVID-19 case-weighted 
 
 
 ### Outcome
-With this script, we were able to plot the path of the COVID-19 weighted centroids with line strings and a centroid at the location of the final week's centroid. We also include a choropleth map for the case count in the last available epidemiological week using a logarithmic classification due to the wide range of case counts in the different municipalities. We also wanted a table exported containing lengths of each line connecting the centroids, the length between each centroid and the capital city, and the direction of the line. These were included to answer specific research questions. 
+With this script, we were able to plot the path of the COVID-19 weighted centroids with line strings and a centroid at the location of the final week's centroid. We also include a choropleth map for the case count in the last available epidemiological week using a exponential classification due to the wide range of case counts in the different municipalities. We also wanted a table exported containing lengths of each line connecting the centroids, the length between each centroid and the capital city, and the direction of the line. These were included to answer specific research questions. 
 
 Example output: 
 
