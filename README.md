@@ -51,10 +51,10 @@ Input files:
     
 Code changes: 
 * File paths: change line numbers 22, 29, 37, 251
-* Numbers for start and end week: change line number 104, 105, 133, 222, 244, 251, 281, 286
+* Numbers for start and end week: change line number 103, 104, 133, 222, 243, 251, 281, 286
     
 Visualizations/ plotting:
-* Logarithmic classification: can be altered in the map creation in line number 248
+* Exponential classification: can be altered in the map creation in line number 248
 * Map title, labels, etc: change in line number 248
 
 
