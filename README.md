@@ -23,7 +23,7 @@ With this script, we were able to plot the path of the COVID-19 weighted centroi
 
 Example output: 
 
-< animation of moving centroid with weekly progression or week 27 static map > 
+![Alt text](/Users/erin/Desktop/Harvard_NSF_REU/Brazil_COVID/github/Nation_all_weeks_animated.gif?raw=true "Title")
 
 ## Guidance
 This script may be adapated to different countries by an individual comfortable with R scripting. This process will work with any sub-unit of a nation, whether it be regions, states, counties, municpalities,or census tracts, as long as there are smaller units which make up a larger unit for which you want to find the weighted centroid for. In order to adapt this script, we recommend the following files/formats and potential code changes: 
